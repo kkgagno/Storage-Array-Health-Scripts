@@ -1,0 +1,231 @@
+--Search a file for a string, displays the whole line:
+select-string -path c:\b1.txt -pattern ..":"..":"..":"..":"..":"..":"..":"..
+
+--This one is parsing the results from 'symmaccess -sid 1665 list logins > c:logins.txt' dumping wwns logged in and on the fabric
+get-childitem C:\logins.txt | select-string -pattern ................................................................"Yes"...."Yes" | foreach {$_.line} > c:\Loginsout.txt
+
+
+--Searches for 6c:45 and gives back it's whole line:
+get-childitem C:\Users\11500162\Desktop\ciscoB.log | select-string -pattern ..................6c:45 | foreach {$_.line}
+get-childitem C:\dumps\csymmcommands.txt | select-string -pattern symaccess.-sid.1943.-wwn | foreach {$_.line}
+
+--Compare 2 files and show the differences:
+compare-object (gc "d:\9710-0.log") (gc "d:\9710-0xx.log") | format-list | Out-File c:\vb\9710-0compare.txt
+
+
+############################################################################################################################################
+----Add each line to .ps1 file to run in script
+--Dump switchshow |grep wwn script in putty to logs, then run the following to dump only the lines with active logins
+--Searches and displays line that start with space, 0-9, then 0-9, then 0-9 again
+get-childitem C:\Users\11500162\Desktop\B1.log | select-string -pattern .[0-9][0-9][0-9]............... | foreach {$_.line} > c:\b1.txt
+
+--Run this against the output of the above to strip everything but the pattern in the command
+select-string -path c:\b1.txt -Pattern ..":"..":"..":"..":"..":"..":"..":".. -AllMatches | % { $_.Matches } | % { $_.Value } > c:\wwns.txt
+
+--Run this to compare the wwns you have in your list compared to what is on the switch, fill wwns2.txt with all the wwns you got from the array
+compare-object (gc "c:\wwns.txt") (gc "c:\wwns2.txt") | format-list | Out-File c:\wwnsout.txt
+
+--To open output file just type
+c:\wwnsout.txt
+############################################################################################################################################
+
+--Display all the devices in an export of a host on VSP
+select-string -path "C:\Users\A617954\Desktop\170207-LUNsExport.tsv" -Pattern ..":"..":".. -AllMatches | % { $_.Matches } | % { $_.Value }
+
+--Dump cfgactvshow to log and run the following to get zones
+get-childitem C:\B2.log | select-string -pattern .zone:.mvssesx.. | foreach {$_.line}
+
+--display create dev lines
+get-childitem C:\VB\WWNs\VMAX_VPLEX\symaccess.txt | select-string -pattern create.dev | foreach {$_.line}
+get-childitem C:\VB\WWNs\VMAX_VPLEX\VPLEX\vplexclaimVMAX_OUTPUT.txt | select-string -pattern symdev.show................Bound | foreach {$_.line}
+
+--display storage volumes on vplex from drill down command
+get-childitem C:\VB\vplexvolumes.txt | select-string -pattern storage-volume: | foreach {$_.line}
+
+--display the lines displaying the director
+get-childitem C:\VB\WWNs\VMAX_VPLEX\symdev.txt | select-string -pattern symdev.show................Not | foreach {$_.line}
+get-childitem C:\VB\WWNs\VMAX_VPLEX\VPLEX\vplexclaimVMAX_OUTPUT.txt | select-string -pattern symdev.show................Bound | foreach {$_.line}
+
+--display the lines with masking list assign info
+get-childitem C:\VB\WWNs\VMAX_VPLEX\symmaskWRITE.txt | select-string -pattern symmaskdb | foreach {$_.line}
+
+--displays the lines with write disable commands
+get-childitem C:\VB\WWNs\VMAX_VPLEX\symmaskWRITE.txt | select-string -pattern symdev | foreach {$_.line}
+
+--show just the pool info from the output from symdev.vbs
+select-string -path c:\vb\pool.txt -Pattern ..._FC_Pool. -AllMatches | % { $_.Matches } | % { $_.Value }
+
+--Compare 2 files
+compare-object (gc "c:\track.txt") (gc "c:\wb.txt") | format-list | Out-File c:\compare.txt
+
+--Display the wwns from the output of findstr with devs with wwns, symmetrix
+select-string -path c:\vb\symmwwns.txt -Pattern 60060480000190101665............ -AllMatches | % { $_.Matches } | % { $_.Value }
+
+############################################################################################################################################
+Script for taking all lun wwns without colons and adding colons:
+
+$macs = Get-Content C:\VB\lunwwn.txt
+$output = foreach ($mac in $macs){
+    $mac.insert(2,":").insert(5,":").insert(8,":").insert(11,":").insert(14,":").insert(17,":").insert(20,":").insert(23,":").insert(26,":").insert(29,":").insert(32,":").insert(35,":").insert(38,":").insert(41,":").insert(44,":")
+}
+$output | Out-File c:\VB\newlunwwn.txt
+############################################################################################################################################
+
+How to search output of all sym device groups and get RDF info back
+symdg list -v |Select-String  "Symmetrix ID","Group Number","RDF Mode","Time that R2 is behind R1" 
+(Get-Content -Raw SRDF_stats.csv) -replace ' : ', ',' >Repl_stats.csv
+
+
+
+SRDF GET RPO SCRIPT(PS AND VB)################################################################################################
+#PS PORTION:  Runs commands, dumps to text files, and strips information to just results.
+symdg list -v |Select-String  "Symmetrix ID","Group Number","RDF Mode","Time that R2 is behind R1" >C:\VB\SRDF_stats.txt
+
+
+
+
+
+gc C:\VB\SRDF_stats.txt | % { if($_ -notmatch "Remote Symmetrix ID" -AND $_ -match "Symmetrix ID") {write-output $_}} >> C:\VB\symid.txt
+$file = "C:\VB\symid.txt"
+Get-Content $file  | Foreach {$_ -replace "    Symmetrix ID                                 : ", ""} | Set-Content "C:\VB\symid2.txt"
+
+
+
+gc C:\VB\SRDF_stats.txt | % { if($_ -match "Remote Symmetrix ID") {write-output $_}} >> C:\VB\remsymid.txt
+$file = "C:\VB\remsymid.txt"
+Get-Content $file  | Foreach {$_ -replace "        Remote Symmetrix ID                    : ", ""} | Set-Content "C:\VB\remsymid2.txt"
+
+
+gc C:\VB\SRDF_stats.txt | % { if($_ -match "Group Number") {write-output $_}} >> C:\VB\group.txt
+$file = "C:\VB\group.txt"
+Get-Content $file  | Foreach {$_ -replace "        RDF \(RA\) Group Number                  :  ", ""} | Set-Content "C:\VB\group2.txt"
+
+
+gc C:\VB\SRDF_stats.txt | % { if($_ -match "RDF Mode") {write-output $_}} >> C:\VB\mode.txt
+$file = "C:\VB\mode.txt"
+Get-Content $file  | Foreach {$_ -replace "        RDF Mode                               : ", ""} | Set-Content "C:\VB\mode2.txt"
+
+
+
+gc C:\VB\SRDF_stats.txt | % { if($_ -match "Time that R2 is behind R1") {write-output $_}} >> C:\VB\time.txt
+$file = "C:\VB\time.txt"
+Get-Content $file  | Foreach {$_ -replace "            Time that R2 is behind R1          : ", ""} | Set-Content "C:\VB\time2.txt"
+
+
+
+Remove-Item C:\VB\symid.txt
+Remove-Item C:\VB\remsymid.txt
+Remove-Item C:\VB\group.txt
+Remove-Item C:\VB\mode.txt
+Remove-Item C:\VB\time.txt
+Remove-Item C:\VB\SRDF_stats.txt
+Remove-Item C:\VB\srdf_stats.csv
+
+
+#VB PORTION: Creates csv file, adds headers and appends info line by line from PS created text files.
+Set objEmail = CreateObject ("CDO.Message")
+DateInfo = DateInfo & Now & VbCrLf
+Const ForReading = 1
+Const ForWriting = 2
+Const ForAppending = 8
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+Set tf = objFSO.CreateTextFile("c:\VB\srdf_stats.csv", True)
+
+Set objTextFile = objFSO.OpenTextFile _
+    ("c:\VB\symid2.txt", ForReading)
+
+
+Set objTextFile2 = objFSO.OpenTextFile _
+    ("c:\VB\remsymid2.txt", ForReading)
+
+
+Set objTextFile3 = objFSO.OpenTextFile _
+    ("c:\VB\group2.txt", ForReading)
+
+
+Set objTextFile4 = objFSO.OpenTextFile _
+    ("c:\VB\mode2.txt", ForReading)
+
+
+
+Set objTextFile5 = objFSO.OpenTextFile _
+    ("c:\VB\time2.txt", ForReading)
+
+'tf.writeline "Source Array, Remote Array, Replication Group, Replication Mode, Time that R2 is behind R1, Date/Time recorded"
+
+Do While Not objTextFile.AtEndofStream
+
+strResponses = objTextFile.ReadLine
+strResponses2 = objTextFile2.ReadLine
+strResponses3 = objTextFile3.ReadLine
+strResponses4 = objTextFile4.ReadLine
+strResponses5 = objTextFile5.ReadLine
+	
+
+tf.writeline strResponses & "," & strResponses2 & "," & strResponses3 & "," & strResponses4 & "," & strResponses5 & "," & DateInfo
+
+
+
+Loop
+objTextFile.Close
+objTextFile2.Close
+objTextFile3.Close
+objTextFile4.Close
+objTextFile5.Close
+tf.close
+
+
+
+Set objFile = objFSO.OpenTextFile("c:\VB\srdf_stats.csv", ForReading)
+
+
+Do Until objFile.AtEndOfStream
+
+    strLine = objFile.Readline
+
+    strLine = Trim(strLine)
+
+    If Len(strLine) > 0 Then
+
+        strNewContents = strNewContents & strLine & vbCrLf
+
+    End If
+
+Loop
+
+
+objFile.Close
+
+
+Set objFile = objFSO.OpenTextFile("c:\VB\Allscripts_srdf_stats.csv", ForAppending, True)
+
+objFile.Write strNewContents
+
+objFile.Close
+
+#VB email
+Set objEmail = CreateObject ("CDO.Message")
+DateInfo = DateInfo & Now & VbCrLf
+Const ForReading = 1
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+
+StrComputer = "."
+Set objWMIService = GetObject ("winmgmts:" & "{impersonationLevel=impersonate}!\\" & strComputer & "\root\cimv2")
+Set colSettings = objWMIService.ExecQuery ("Select * FROM Win32_ComputerSystem")
+For Each objSysInfo In colSettings
+UserName = objSysinfo.UserName
+Next	
+objEmail.From = "noreply@eclipsys.com"
+objEmail.To = "keith.gagnon@atos.net"
+objEmail.Subject = "Daily SRDF stats"
+objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/sendusing") = 2
+objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpserver") = "172.30.4.18"
+objEmail.Configuration.Fields.Item ("http://schemas.microsoft.com/cdo/configuration/smtpserverport") = 25
+
+objEmail.AddAttachment "C:\VB\Allscripts_srdf_stats.csv"
+objEmail.Configuration.Fields.Update
+objEmail.Send
+##############################################################################################################################
+Display SRDF device groups and their corresponding RA group number
+symdg list -v |Select-String "Group Name", "Group Number" 
